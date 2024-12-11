@@ -7,6 +7,7 @@ Object.defineProperty(exports, "__esModule", {
 exports.createInsightsMiddleware = createInsightsMiddleware;
 var _helpers = require("../helpers");
 var _utils = require("../lib/utils");
+var _uuid = require("../lib/utils/uuid");
 function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); enumerableOnly && (symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; })), keys.push.apply(keys, symbols); } return keys; }
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = null != arguments[i] ? arguments[i] : {}; i % 2 ? ownKeys(Object(source), !0).forEach(function (key) { _defineProperty(target, key, source[key]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)) : ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } return target; }
 function _defineProperty(obj, key, value) { key = _toPropertyKey(key); if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
@@ -22,7 +23,7 @@ function _unsupportedIterableToArray(o, minLen) { if (!o) return; if (typeof o =
 function _iterableToArray(iter) { if (typeof Symbol !== "undefined" && iter[Symbol.iterator] != null || iter["@@iterator"] != null) return Array.from(iter); }
 function _arrayWithoutHoles(arr) { if (Array.isArray(arr)) return _arrayLikeToArray(arr); }
 function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len = arr.length; for (var i = 0, arr2 = new Array(len); i < len; i++) arr2[i] = arr[i]; return arr2; }
-var ALGOLIA_INSIGHTS_VERSION = '2.6.0';
+var ALGOLIA_INSIGHTS_VERSION = '2.17.2';
 var ALGOLIA_INSIGHTS_SRC = "https://cdn.jsdelivr.net/npm/search-insights@".concat(ALGOLIA_INSIGHTS_VERSION, "/dist/search-insights.min.js");
 function createInsightsMiddleware() {
   var props = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
@@ -30,7 +31,9 @@ function createInsightsMiddleware() {
     insightsInitParams = props.insightsInitParams,
     onEvent = props.onEvent,
     _props$$$internal = props.$$internal,
-    $$internal = _props$$$internal === void 0 ? false : _props$$$internal;
+    $$internal = _props$$$internal === void 0 ? false : _props$$$internal,
+    _props$$$automatic = props.$$automatic,
+    $$automatic = _props$$$automatic === void 0 ? false : _props$$$automatic;
   var potentialInsightsClient = _insightsClient;
   if (!_insightsClient && _insightsClient !== null) {
     (0, _utils.safelyRunOnBrowser)(function (_ref) {
@@ -77,9 +80,11 @@ function createInsightsMiddleware() {
 
     // search-insights.js also throws an error so dev-only clarification is sufficient
     process.env.NODE_ENV === 'development' ? (0, _utils.warning)(Boolean(appId && apiKey), 'could not extract Algolia credentials from searchClient in insights middleware.') : void 0;
+    var queuedInitParams = undefined;
     var queuedUserToken = undefined;
     var userTokenBeforeInit = undefined;
-    if (Array.isArray(insightsClient.queue)) {
+    var queue = insightsClient.queue;
+    if (Array.isArray(queue)) {
       // Context: The umd build of search-insights is asynchronously loaded by the snippet.
       //
       // When user calls `aa('setUserToken', 'my-user-token')` before `search-insights` is loaded,
@@ -90,21 +95,27 @@ function createInsightsMiddleware() {
       // At this point, even though `search-insights` is not loaded yet,
       // we still want to read the token from the queue.
       // Otherwise, the first search call will be fired without the token.
-      var _ref3 = (0, _utils.find)(insightsClient.queue.slice().reverse(), function (_ref5) {
-        var _ref6 = _slicedToArray(_ref5, 1),
-          method = _ref6[0];
-        return method === 'setUserToken';
-      }) || [];
-      var _ref4 = _slicedToArray(_ref3, 2);
-      queuedUserToken = _ref4[1];
+      var _map = ['setUserToken', 'init'].map(function (key) {
+        var _ref3 = (0, _utils.find)(queue.slice().reverse(), function (_ref5) {
+            var _ref6 = _slicedToArray(_ref5, 1),
+              method = _ref6[0];
+            return method === key;
+          }) || [],
+          _ref4 = _slicedToArray(_ref3, 2),
+          value = _ref4[1];
+        return value;
+      });
+      var _map2 = _slicedToArray(_map, 2);
+      queuedUserToken = _map2[0];
+      queuedInitParams = _map2[1];
     }
+
+    // If user called `aa('setUserToken')` before creating the Insights middleware,
+    // we temporarily store the token and set it later on.
+    //
+    // Otherwise, the `init` call might override them with anonymous user token.
     insightsClient('getUserToken', null, function (_error, userToken) {
-      // If user has called `aa('setUserToken', 'my-user-token')` before creating
-      // the `insights` middleware, we store them temporarily and
-      // set it later on.
-      //
-      // Otherwise, the `init` call might override it with anonymous user token.
-      userTokenBeforeInit = userToken;
+      userTokenBeforeInit = normalizeUserToken(userToken);
     });
 
     // Only `init` if the `insightsInitParams` option is passed or
@@ -121,6 +132,7 @@ function createInsightsMiddleware() {
     return {
       $$type: 'ais.insights',
       $$internal: $$internal,
+      $$automatic: $$automatic,
       onStateChange: function onStateChange() {},
       subscribe: function subscribe() {
         if (!insightsClient.shouldAddScript) return;
@@ -141,26 +153,45 @@ function createInsightsMiddleware() {
       },
       started: function started() {
         insightsClient('addAlgoliaAgent', 'insights-middleware');
-        helper = instantSearchInstance.helper;
-        initialParameters = {
-          userToken: helper.state.userToken,
-          clickAnalytics: helper.state.clickAnalytics
-        };
-        helper.overrideStateWithoutTriggeringChangeEvent(_objectSpread(_objectSpread({}, helper.state), {}, {
-          clickAnalytics: true
-        }));
+        helper = instantSearchInstance.mainHelper;
+        var queueAtStart = insightsClient.queue;
+        if (Array.isArray(queueAtStart)) {
+          var _map3 = ['setUserToken', 'init'].map(function (key) {
+            var _ref7 = (0, _utils.find)(queueAtStart.slice().reverse(), function (_ref9) {
+                var _ref10 = _slicedToArray(_ref9, 1),
+                  method = _ref10[0];
+                return method === key;
+              }) || [],
+              _ref8 = _slicedToArray(_ref7, 2),
+              value = _ref8[1];
+            return value;
+          });
+          var _map4 = _slicedToArray(_map3, 2);
+          queuedUserToken = _map4[0];
+          queuedInitParams = _map4[1];
+        }
+        initialParameters = getInitialParameters(instantSearchInstance);
+
+        // We don't want to force clickAnalytics when the insights is enabled from the search response.
+        // This means we don't enable insights for indices that don't opt in
+        if (!$$automatic) {
+          helper.overrideStateWithoutTriggeringChangeEvent(_objectSpread(_objectSpread({}, helper.state), {}, {
+            clickAnalytics: true
+          }));
+        }
         if (!$$internal) {
           instantSearchInstance.scheduleSearch();
         }
         var setUserTokenToSearch = function setUserTokenToSearch(userToken) {
           var immediate = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
-          if (!userToken) {
+          var normalizedUserToken = normalizeUserToken(userToken);
+          if (!normalizedUserToken) {
             return;
           }
           var existingToken = helper.state.userToken;
           function applyToken() {
             helper.overrideStateWithoutTriggeringChangeEvent(_objectSpread(_objectSpread({}, helper.state), {}, {
-              userToken: userToken
+              userToken: normalizedUserToken
             }));
             if (existingToken && existingToken !== userToken) {
               instantSearchInstance.scheduleSearch();
@@ -174,25 +205,58 @@ function createInsightsMiddleware() {
             applyToken();
           }
         };
-        var anonymousUserToken = (0, _helpers.getInsightsAnonymousUserTokenInternal)();
-        if (anonymousUserToken) {
-          // When `aa('init', { ... })` is called, it creates an anonymous user token in cookie.
-          // We can set it as userToken.
-          setUserTokenToSearch(anonymousUserToken, true);
+        function setUserToken(token) {
+          setUserTokenToSearch(token, true);
+          insightsClient('setUserToken', token);
         }
+        var anonymousUserToken = undefined;
+        var anonymousTokenFromInsights = (0, _helpers.getInsightsAnonymousUserTokenInternal)();
+        if (anonymousTokenFromInsights) {
+          // When `aa('init', { ... })` is called, it creates an anonymous user token in cookie.
+          // We can set it as userToken on instantsearch and insights. If it's not set as an insights
+          // userToken before a sendEvent, insights automatically generates a new anonymous token,
+          // causing a state change and an unnecessary query on instantsearch.
+          anonymousUserToken = anonymousTokenFromInsights;
+        } else {
+          var token = "anonymous-".concat((0, _uuid.createUUID)());
+          anonymousUserToken = token;
+        }
+        var userTokenFromInit;
 
-        // We consider the `userToken` coming from a `init` call to have a higher
-        // importance than the one coming from the queue.
-        if (userTokenBeforeInit) {
-          setUserTokenToSearch(userTokenBeforeInit, true);
-          insightsClient('setUserToken', userTokenBeforeInit);
+        // With SSR, the token could be be set on the state. We make sure
+        // that insights is in sync with that token since, there is no
+        // insights lib on the server.
+        var tokenFromSearchParameters = initialParameters.userToken;
+
+        // When the first query is sent, the token is possibly not yet set by
+        // the insights onChange callbacks (if insights isn't yet loaded).
+        // It is explicitly being set here so that the first query has the
+        // initial tokens set and ensure a second query isn't automatically
+        // made when the onChange callback actually changes the state.
+        if (insightsInitParams !== null && insightsInitParams !== void 0 && insightsInitParams.userToken) {
+          userTokenFromInit = insightsInitParams.userToken;
+        }
+        if (userTokenFromInit) {
+          setUserToken(userTokenFromInit);
+        } else if (tokenFromSearchParameters) {
+          setUserToken(tokenFromSearchParameters);
+        } else if (userTokenBeforeInit) {
+          setUserToken(userTokenBeforeInit);
         } else if (queuedUserToken) {
-          setUserTokenToSearch(queuedUserToken, true);
-          insightsClient('setUserToken', queuedUserToken);
+          setUserToken(queuedUserToken);
+        } else if (anonymousUserToken) {
+          var _queuedInitParams;
+          setUserToken(anonymousUserToken);
+          if (insightsInitParams !== null && insightsInitParams !== void 0 && insightsInitParams.useCookie || (_queuedInitParams = queuedInitParams) !== null && _queuedInitParams !== void 0 && _queuedInitParams.useCookie) {
+            var _queuedInitParams2;
+            saveTokenAsCookie(anonymousUserToken, (insightsInitParams === null || insightsInitParams === void 0 ? void 0 : insightsInitParams.cookieDuration) || ((_queuedInitParams2 = queuedInitParams) === null || _queuedInitParams2 === void 0 ? void 0 : _queuedInitParams2.cookieDuration));
+          }
         }
 
         // This updates userToken which is set explicitly by `aa('setUserToken', userToken)`
-        insightsClient('onUserTokenChange', setUserTokenToSearch, {
+        insightsClient('onUserTokenChange', function (token) {
+          return setUserTokenToSearch(token, true);
+        }, {
           immediate: true
         });
         var insightsClientWithLocalCredentials = insightsClient;
@@ -209,12 +273,38 @@ function createInsightsMiddleware() {
             return insightsClient(method, payload, extraParams);
           };
         }
+        var viewedObjectIDs = new Set();
+        var lastQueryId;
+        instantSearchInstance.mainHelper.derivedHelpers[0].on('result', function (_ref11) {
+          var results = _ref11.results;
+          if (results && (!results.queryID || results.queryID !== lastQueryId)) {
+            lastQueryId = results.queryID;
+            viewedObjectIDs.clear();
+          }
+        });
         instantSearchInstance.sendEventToInsights = function (event) {
           if (onEvent) {
             onEvent(event, insightsClientWithLocalCredentials);
           } else if (event.insightsMethod) {
+            if (event.insightsMethod === 'viewedObjectIDs') {
+              var _payload = event.payload;
+              var difference = _payload.objectIDs.filter(function (objectID) {
+                return !viewedObjectIDs.has(objectID);
+              });
+              if (difference.length === 0) {
+                return;
+              }
+              difference.forEach(function (objectID) {
+                return viewedObjectIDs.add(objectID);
+              });
+              _payload.objectIDs = difference;
+            }
+
             // Source is used to differentiate events sent by instantsearch from those sent manually.
             event.payload.algoliaSource = ['instantsearch'];
+            if ($$automatic) {
+              event.payload.algoliaSource.push('instantsearch-automatic');
+            }
             if (event.eventModifier === 'internal') {
               event.payload.algoliaSource.push('instantsearch-internal');
             }
@@ -236,6 +326,23 @@ function createInsightsMiddleware() {
     };
   };
 }
+function getInitialParameters(instantSearchInstance) {
+  var _instantSearchInstanc, _instantSearchInstanc2;
+  // in SSR, the initial state we use in this domain is set on the main index
+  var stateFromInitialResults = ((_instantSearchInstanc = instantSearchInstance._initialResults) === null || _instantSearchInstanc === void 0 ? void 0 : (_instantSearchInstanc2 = _instantSearchInstanc[instantSearchInstance.indexName]) === null || _instantSearchInstanc2 === void 0 ? void 0 : _instantSearchInstanc2.state) || {};
+  var stateFromHelper = instantSearchInstance.mainHelper.state;
+  return {
+    userToken: stateFromInitialResults.userToken || stateFromHelper.userToken,
+    clickAnalytics: stateFromInitialResults.clickAnalytics || stateFromHelper.clickAnalytics
+  };
+}
+function saveTokenAsCookie(token, cookieDuration) {
+  var MONTH = 30 * 24 * 60 * 60 * 1000;
+  var d = new Date();
+  d.setTime(d.getTime() + (cookieDuration || MONTH * 6));
+  var expires = "expires=".concat(d.toUTCString());
+  document.cookie = "_ALGOLIA=".concat(token, ";").concat(expires, ";path=/");
+}
 
 /**
  * Determines if a given insights `client` supports the optional call to `init`
@@ -254,4 +361,15 @@ function isModernInsightsClient(client) {
   /* eslint-enable @typescript-eslint/naming-convention */
 
   return v3 || v2_6 || v1_10;
+}
+
+/**
+ * While `search-insights` supports both string and number user tokens,
+ * the Search API only accepts strings. This function normalizes the user token.
+ */
+function normalizeUserToken(userToken) {
+  if (!userToken) {
+    return undefined;
+  }
+  return typeof userToken === 'number' ? userToken.toString() : userToken;
 }

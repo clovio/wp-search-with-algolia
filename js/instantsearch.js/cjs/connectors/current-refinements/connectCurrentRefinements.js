@@ -66,7 +66,7 @@ var connectCurrentRefinements = function connectCurrentRefinements(renderFn) {
         function getItems() {
           if (!results) {
             return transformItems(getRefinementsItems({
-              results: {},
+              results: null,
               helper: helper,
               indexId: helper.state.index,
               includedAttributes: includedAttributes,

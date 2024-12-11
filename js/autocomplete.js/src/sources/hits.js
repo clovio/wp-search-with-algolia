@@ -22,22 +22,18 @@ function createMultiQuerySource() {
   var lastSearch = window.Promise.resolve();
 
   function requestSearch(queryClient, queryIndex) {
-    // Since all requests happen synchronously, this is executed once all the
-    // sources have been requested.
     return window.Promise.resolve()
       .then(function() {
         if (queries.length) {
           lastSearch = queryClient.search(queries);
           queries = [];
         }
-
         return lastSearch;
       })
       .then(function(result) {
         if (!result) {
           return undefined;
         }
-
         lastResults = result.results;
         return lastResults[queryIndex];
       });
@@ -62,7 +58,7 @@ function createMultiQuerySource() {
         .catch(function(error) {
           _.error(error.message);
         });
-    }, 200);
+    }, 300); // 300ms debounce delay
 
     return debouncedSearch;
   };

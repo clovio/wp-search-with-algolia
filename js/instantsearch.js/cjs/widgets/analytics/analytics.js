@@ -124,6 +124,9 @@ var analytics = function analytics(widgetParams) {
     render: function render(_ref2) {
       var results = _ref2.results,
         state = _ref2.state;
+      if (!results) {
+        return;
+      }
       if (isInitialSearch === true) {
         isInitialSearch = false;
         return;

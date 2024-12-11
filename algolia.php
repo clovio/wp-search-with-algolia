@@ -1,12 +1,12 @@
 <?php
 /**
- * Plugin Name:       WP Search with Algolia
+ * Plugin Name:       WP Search with Algolia (clovio version)
  * Plugin URI:        https://github.com/WebDevStudios/wp-search-with-algolia
  * Description:       Integrate the powerful Algolia search service with WordPress
- * Version:           2.8.2
+ * Version:           2.8.3
  * Requires at least: 5.0
  * Requires PHP:      7.4
- * Author:            WebDevStudios
+ * Author:            Clovio
  * Author URI:        https://webdevstudios.com
  * License:           GNU General Public License v2.0 / MIT License
  * Text Domain:       wp-search-with-algolia

@@ -13,6 +13,7 @@ var routers = _interopRequireWildcard(require("./lib/routers/index"));
 var stateMappings = _interopRequireWildcard(require("./lib/stateMappings/index"));
 var _version = _interopRequireDefault(require("./lib/version"));
 var middlewares = _interopRequireWildcard(require("./middlewares/index"));
+var templates = _interopRequireWildcard(require("./templates/index"));
 var widgets = _interopRequireWildcard(require("./widgets/index"));
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function _getRequireWildcardCache(nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
@@ -41,6 +42,7 @@ instantsearch.widgets = widgets;
 instantsearch.middlewares = middlewares;
 instantsearch.routers = routers;
 instantsearch.stateMappings = stateMappings;
+instantsearch.templates = templates;
 instantsearch.createInfiniteHitsSessionStorageCache = _index3.createInfiniteHitsSessionStorageCache;
 instantsearch.highlight = helpers.highlight;
 instantsearch.reverseHighlight = helpers.reverseHighlight;

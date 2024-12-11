@@ -81,5 +81,7 @@ var connectConfigureRelatedItems = function connectConfigureRelatedItems(renderF
     });
   };
 };
+
+/** @deprecated use connectRelatedItems instead */
 var _default = connectConfigureRelatedItems;
 exports.default = _default;

@@ -54,12 +54,13 @@ var connectVoiceSearch = function connectVoiceSearch(renderFn) {
           this._refine = function (query) {
             if (query !== helper.state.query) {
               var queryLanguages = language ? [language.split('-')[0]] : undefined;
+              // @ts-ignore queryLanguages is allowed to be a string, not just an array
               helper.setQueryParameter('queryLanguages', queryLanguages);
               if (typeof additionalQueryParameters === 'function') {
                 helper.setState(helper.state.setQueryParameters(_objectSpread({
                   ignorePlurals: true,
                   removeStopWords: true,
-                  // @ts-ignore (optionalWords only allows array in v3, while string is also valid)
+                  // @ts-ignore optionalWords is allowed to be a string too
                   optionalWords: query
                 }, additionalQueryParameters({
                   query: query

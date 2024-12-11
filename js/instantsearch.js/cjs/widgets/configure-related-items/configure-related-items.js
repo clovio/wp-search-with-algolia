@@ -19,5 +19,7 @@ var configureRelatedItems = function configureRelatedItems(widgetParams) {
     $$widgetType: 'ais.configureRelatedItems'
   });
 };
+
+/** @deprecated use relatedItems instead */
 var _default = configureRelatedItems;
 exports.default = _default;

@@ -12,6 +12,9 @@ var withUsage = createDocumentationMessageGenerator({
   name: 'answers',
   connector: true
 });
+/**
+ * @deprecated the answers service is no longer offered, and this widget will be removed in InstantSearch.js v5
+ */
 var connectAnswers = function connectAnswers(renderFn) {
   var unmountFn = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : noop;
   checkRendering(renderFn, withUsage());
@@ -38,14 +41,15 @@ var connectAnswers = function connectAnswers(renderFn) {
     var lastHits = [];
     var isLoading = false;
     var debouncedRender = debounce(renderFn, renderDebounceTime);
-
-    // this does not directly use DebouncedFunction<findAnswers>, since then the generic will disappear
     var debouncedRefine;
     return {
       $$type: 'ais.answers',
       init: function init(initOptions) {
         var state = initOptions.state,
           instantSearchInstance = initOptions.instantSearchInstance;
+        if (typeof instantSearchInstance.client.initIndex !== 'function') {
+          throw new Error(withUsage('`algoliasearch` <5 required.'));
+        }
         var answersIndex = instantSearchInstance.client.initIndex(state.index);
         if (!hasFindAnswersMethod(answersIndex)) {
           throw new Error(withUsage('`algoliasearch` >= 4.8.0 required.'));

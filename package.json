@@ -18,7 +18,12 @@
     "instantsearch.js": "^4.56.5"
   },
   "devDependencies": {
-    "frontend-dependencies": "^2.0.0"
+    "frontend-dependencies": "^2.0.0",
+    "grunt": "^1.6.1",
+    "grunt-banner": "^0.6.0",
+    "grunt-exec": "^3.0.0",
+    "grunt-sed": "^0.1.1",
+    "grunt-step": "^1.0.0"
   },
   "frontendDependencies": {
     "target": "js/",

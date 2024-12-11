@@ -58,19 +58,25 @@ var connectAutocomplete = function connectAutocomplete(renderFn) {
           };
         }
         var indices = scopedResults.map(function (scopedResult) {
+          var _scopedResult$results2, _scopedResult$results3;
           // We need to escape the hits because highlighting
           // exposes HTML tags to the end-user.
-          scopedResult.results.hits = escapeHTML ? escapeHits(scopedResult.results.hits) : scopedResult.results.hits;
+          if (scopedResult.results) {
+            scopedResult.results.hits = escapeHTML ? escapeHits(scopedResult.results.hits) : scopedResult.results.hits;
+          }
           var sendEvent = createSendEventForHits({
             instantSearchInstance: instantSearchInstance,
-            index: scopedResult.results.index,
+            getIndex: function getIndex() {
+              var _scopedResult$results;
+              return ((_scopedResult$results = scopedResult.results) === null || _scopedResult$results === void 0 ? void 0 : _scopedResult$results.index) || '';
+            },
             widgetType: _this.$$type
           });
           return {
             indexId: scopedResult.indexId,
-            indexName: scopedResult.results.index,
-            hits: scopedResult.results.hits,
-            results: scopedResult.results,
+            indexName: ((_scopedResult$results2 = scopedResult.results) === null || _scopedResult$results2 === void 0 ? void 0 : _scopedResult$results2.index) || '',
+            hits: ((_scopedResult$results3 = scopedResult.results) === null || _scopedResult$results3 === void 0 ? void 0 : _scopedResult$results3.hits) || [],
+            results: scopedResult.results || {},
             sendEvent: sendEvent
           };
         });
