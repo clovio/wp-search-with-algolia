@@ -4,6 +4,18 @@ var _ = require('../common/utils.js');
 var version = require('../../version.js');
 var parseAlgoliaClientVersion = require('../common/parseAlgoliaClientVersion.js');
 
+function debounce(func, wait) {
+  var timeout;
+  return function() {
+    var context = this;
+    var args = arguments;
+    clearTimeout(timeout);
+    timeout = setTimeout(function() {
+      func.apply(context, args);
+    }, wait);
+  };
+}
+
 function createMultiQuerySource() {
   var queries = [];
   var lastResults = [];
@@ -32,7 +44,7 @@ function createMultiQuerySource() {
   }
 
   return function multiQuerySource(searchIndex, params) {
-    return function search(query, cb) {
+    var debouncedSearch = debounce(function(query, cb) {
       var queryClient = searchIndex.as;
       var queryIndex =
         queries.push({
@@ -50,7 +62,9 @@ function createMultiQuerySource() {
         .catch(function(error) {
           _.error(error.message);
         });
-    };
+    }, 200);
+
+    return debouncedSearch;
   };
 }
 
